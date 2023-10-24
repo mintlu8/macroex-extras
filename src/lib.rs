@@ -1,85 +1,40 @@
 //! Additional "fun" extractors for macroex.
 
-use macroex::*;
+use macroex::{proc_macro2::{TokenStream, TokenTree, Delimiter}, FromMacro};
+use quote::ToTokens;
 
-/// Parses an angle.
-/// # Cases
-/// * `45 degrees` or `45.0 deg`
-/// * `1.2 rad` or `0 radians`
-/// * `pi`
-/// * `pi/2` or  `pi/2.0`
-/// * `2 pi` or  `2.0 pi`
-/// * `2/3 pi` or  `2.0 / 3.0 pi`
-/// 
-/// To use with from_one, enclose in brackets `[]`
-#[derive(Debug, Clone, Copy, Default, PartialEq)]
-pub struct Angle(pub f32);
+mod angle;
+mod color;
 
-impl FromMacro for Angle {
-    fn from_one(tt: proc_macro2::TokenTree) -> Result<Self, Error> {
-        let Bracketed(tokens) = Bracketed::from_one(tt)?;
-        Self::from_many(tokens)
-    }
+/// This replaces the idiom `Option<Either<CurlyBraced<TokenStream>, T>>` commonly
+/// used in parsing contents that may be expressions.
+#[derive(Debug, Clone, Default)]
+pub enum MaybeExpr<T>{
+    #[default]
+    None,
+    Value(T),
+    Expr(TokenStream),
+}
 
-    fn from_many(tokens: proc_macro2::TokenStream) -> Result<Self, Error> {
-        let mut iter = tokens.into_iter();
-        ident_validator!(PI "pi");
-        ident_validator!(Deg "deg");
-        match iter.extract()? {
-            Either::A(PI) => {
-                if let Ok(PunctOf::<'/'>) = iter.extract(){
-                    let Number(numer) = iter.extract()?;
-                    let EndOfStream = iter.extract()?;
-                    Ok(Self(std::f32::consts::PI / numer))
-                } else {
-                    Ok(Self(std::f32::consts::PI))
-                }
+
+impl<T: FromMacro> FromMacro for MaybeExpr<T> {
+    fn from_one(tt: macroex::proc_macro2::TokenTree) -> Result<Self, macroex::Error> {
+        match tt {
+            TokenTree::Group(ref g) if g.delimiter() == Delimiter::Brace => {
+                Ok(Self::Expr(g.stream()))
             },
-            Either::B(Number(value)) => {
-                match iter.extract()? {
-                    Either::A(IdentString(s)) => {
-                        match s.as_str() {
-                            "pi" => (),
-                            "rad" | "radians" => (),
-                            "deg" | "degrees" => (),
-                        }
-                    },
-                    Either::B(PunctOf::<'/'>) => (),
-                }
-            },
+            tt => Ok(Self::Value(T::from_one(tt)?))
         }
     }
 }
 
 
-/// Parses a Rectangle.
-/// 
-/// Accepts 2 of 
-/// `min`, `center`, `max` and `dim`.
-/// 
-/// Returns `min` and `dim`.
-pub struct Rectangle(pub [f32;2], pub [f32;2]);
-
-
-/// Parses an Rectangle.
-/// 
-/// Accepts 2 of 
-/// `bottomleft`, `center`, `topright` and `dimension`.
-/// 
-/// Returns `bottomleft` and `dimension`.
-pub struct RectBLTR(pub [f32;2], pub [f32;2]);
-
-/// Parses an Rectangle.
-/// 
-/// Accepts 2 of 
-/// `topleft`, `center`, `bottomright` and `dimension`.
-/// 
-/// Returns `topleft` and `dimension`.
-pub struct RectTLBR(pub [f32;2], pub [f32;2]);
-
-
-
-/// Parses an RGBA Color.
-/// 
-/// See `colorthis` for documentations.
-pub struct Rgba<T>(T);
+impl<T: ToTokens> quote::ToTokens for MaybeExpr<T> {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        match self {
+            MaybeExpr::None => panic!("Cannot format None."),
+            MaybeExpr::Value(v) => v.to_tokens(tokens),
+            MaybeExpr::Expr(t) => t.to_tokens(tokens),
+        }
+    }
+}
