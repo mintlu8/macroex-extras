@@ -45,7 +45,7 @@ impl FromMacro for Angle {
             },
             Either3::B(Number(value)) => {
                 match iter.extract()? {
-                    Either::A(Spanned(span, IdentString(s))) => {
+                    OrEndOfStream(Some(Either::A(Spanned(span, IdentString(s))))) => {
                         match s.as_str() {
                             "pi" => Ok(Self(value * PI)),
                             "rad" | "radians" => Ok(Self(value)),
@@ -53,11 +53,14 @@ impl FromMacro for Angle {
                             _ => bail!(span, r#"Expected "pi", "rad", "radians", "deg" or "degrees", found {}"#, s)
                         }
                     },
-                    Either::B(PunctOf::<'/'>) => {
+                    OrEndOfStream(Some(Either::B(PunctOf::<'/'>))) => {
                         let Number::<f32>(numer) = iter.extract()?;
                         let LitPi = iter.extract()?;
                         Ok(Self(value / numer * PI))
                     },
+                    OrEndOfStream(None) => {
+                        Ok(Self(value))
+                    }
                 }
             },
             Either3::C(PunctOf::<'-'>) => {

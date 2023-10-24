@@ -1,4 +1,4 @@
-use macroex::{FromMacro, Either4, HexNumber, proc_macro2::{Span, Ident, TokenTree}, Error, bail, NumberList, Either};
+use macroex::{FromMacro, Either4, HexNumber, proc_macro2::{Span, Ident, TokenTree}, Error, bail, NumberList, Either, Splat};
 
 fn hex(a: u8, span: Span) -> Result<u8, Error> {
     Ok(match a {
@@ -82,8 +82,21 @@ fn i2f(floats: [u8; 4]) -> [f32; 4] {
 
 /// Parses an RGBA Color.
 ///
-/// See `colorthis` for documentations.
-pub struct Rgba<T>(T);
+/// # Schema
+/// * Bracketed numbers: `[0.3, 0.72, 0.98]`, `[124, 54, 87, 255]`
+/// * Repeat syntax: `[0.3; 3]`, `[0.7; 4]`
+/// * Hex strings: `"AABBCC"`, `"AABBCCFF"`, `"#AABBCC"`, `"#AABBCCFF"`
+/// * Hex number literals: `0xAABBCC`, `0xAABBCCFF`
+/// * CSS color names: `Red`, `Blue`
+/// * TailwindCSS color names: `Red100`, `Sky400`
+///
+/// # Conversion
+/// Ints are in `0..=255`, floats are in `0.0..=1.0`.
+///
+/// When parsing to u8, if any value is a float, the color is considered in range `0.0..=1.0`
+///
+/// When parsing to float, if all values are ints and any of them is`>= 2`, the color is considered to be in range `0.0..=255.0`.
+pub struct Rgba<T>(pub T);
 
 fn parse_color_name(name: &str, span: Span) -> Result<[u8; 4], Error>{
     if let Some(num) = name.find(|x| ('0'..='9').contains(&x)) {
@@ -105,15 +118,33 @@ fn parse_color_name(name: &str, span: Span) -> Result<[u8; 4], Error>{
     }
 }
 
+fn padi(arr: [u8; 3]) -> [u8; 4] {
+    [arr[0], arr[1], arr[2], 255]
+}
+
+fn padif(arr: [u8; 3]) -> [u8; 4] {
+    if arr.iter().all(|x| *x == 0 || *x == 1) {
+        [arr[0], arr[1], arr[2], 1]
+    } else {
+        [arr[0], arr[1], arr[2], 255]
+    }
+}
+
+fn padf(arr: [f32; 3]) -> [f32; 4] {
+    [arr[0], arr[1], arr[2], 1.0]
+}
+
 impl FromMacro for Rgba<[u8; 4]> {
     fn from_one(tt: macroex::proc_macro2::TokenTree) -> Result<Self, macroex::Error> {
         let span = tt.span();
         match Either4::from_one(tt)? {
-            Either4::A(group) => {
+            Either4::A(Splat(group)) => {
                 let tt = TokenTree::Group(group);
-                match Either::from_one(tt)? {
-                    Either::A(ints) => Ok(Self(ints)),
-                    Either::B(NumberList(floats)) => Ok(Self(f2i(floats)))
+                match Either4::from_one(tt)? {
+                    Either4::A(ints) => Ok(Self(padi(ints))),
+                    Either4::B(ints) => Ok(Self(ints)),
+                    Either4::C(NumberList(floats)) => Ok(Self(f2i(padf(floats)))),
+                    Either4::D(NumberList(floats)) => Ok(Self(f2i(floats))),
                 }
             },
             Either4::B(string) => {
@@ -141,11 +172,13 @@ impl FromMacro for Rgba<[f32; 4]> {
     fn from_one(tt: macroex::proc_macro2::TokenTree) -> Result<Self, macroex::Error> {
         let span = tt.span();
         match Either4::from_one(tt)? {
-            Either4::A(group) => {
+            Either4::A(Splat(group)) => {
                 let tt = TokenTree::Group(group);
-                match Either::from_one(tt)? {
-                    Either::A(ints) => Ok(Self(smart_i2f(ints))),
-                    Either::B(NumberList(floats)) => Ok(Self(floats))
+                match Either4::from_one(tt)? {
+                    Either4::A(ints) => Ok(Self(smart_i2f(padif(ints)))),
+                    Either4::B(ints) => Ok(Self(smart_i2f(ints))),
+                    Either4::C(NumberList(floats)) => Ok(Self(padf(floats))),
+                    Either4::D(NumberList(floats)) => Ok(Self(floats)),
                 }
             },
             Either4::B(string) => {

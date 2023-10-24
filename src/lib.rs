@@ -6,6 +6,9 @@ use quote::ToTokens;
 mod angle;
 mod color;
 
+pub use angle::Angle;
+pub use color::Rgba;
+
 /// This replaces the idiom `Option<Either<CurlyBraced<TokenStream>, T>>` commonly
 /// used in parsing contents that may be expressions.
 #[derive(Debug, Clone, Default)]
