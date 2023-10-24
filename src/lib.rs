@@ -19,6 +19,16 @@ pub enum MaybeExpr<T>{
     Expr(TokenStream),
 }
 
+impl<T> MaybeExpr<T> {
+    pub fn is_some(&self) -> bool {
+        !matches!(self, MaybeExpr::None)
+    }
+    
+    pub fn is_none(&self) -> bool {
+        matches!(self, MaybeExpr::None)
+    }
+}
+
 
 impl<T: FromMacro> FromMacro for MaybeExpr<T> {
     fn from_one(tt: macroex::proc_macro2::TokenTree) -> Result<Self, macroex::Error> {
