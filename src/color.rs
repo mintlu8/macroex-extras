@@ -1,4 +1,4 @@
-use macroex::{FromMacro, Either4, HexNumber, proc_macro2::{Span, Ident, TokenTree}, Error, bail, NumberList, Either, Splat};
+use macroex::{FromMacro, Either4, HexNumber, proc_macro2::{Span, Ident, TokenTree}, Error, bail, NumberList, Splat};
 
 fn hex(a: u8, span: Span) -> Result<u8, Error> {
     Ok(match a {

@@ -27,6 +27,13 @@ impl<T> MaybeExpr<T> {
     pub fn is_none(&self) -> bool {
         matches!(self, MaybeExpr::None)
     }
+
+    pub fn get(&self) -> Option<&Self> {
+        match self {
+            MaybeExpr::None => None,
+            expr => Some(expr),
+        }
+    }
 }
 
 
