@@ -15,7 +15,7 @@ use macroex::{*, proc_macro2::*};
 /// * `pi/2` or  `pi/2.0`
 /// * `2 pi` or  `2.0 pi`
 /// * `2/3 pi` or  `2.0 / 3.0 pi`
-#[derive(Debug, Clone, Copy, Default, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Angle(pub f32);
 
 pub const PI: f32 = std::f32::consts::PI;

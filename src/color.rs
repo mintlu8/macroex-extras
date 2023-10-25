@@ -96,6 +96,7 @@ fn i2f(floats: [u8; 4]) -> [f32; 4] {
 /// When parsing to u8, if any value is a float, the color is considered in range `0.0..=1.0`
 ///
 /// When parsing to float, if all values are ints and any of them is`>= 2`, the color is considered to be in range `0.0..=255.0`.
+#[derive(Debug, Default, PartialEq, Eq, Hash)]
 pub struct Rgba<T>(pub T);
 
 fn parse_color_name(name: &str, span: Span) -> Result<[u8; 4], Error>{
