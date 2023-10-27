@@ -1,6 +1,6 @@
 //! Additional "fun" extractors for macroex.
 
-use macroex::{proc_macro2::{TokenStream, TokenTree, Delimiter}, FromMacro};
+use macroex::{proc_macro2::{TokenStream, TokenTree, Delimiter}, FromMacro, StreamExtract, All};
 use quote::ToTokens;
 
 mod angle;
@@ -12,14 +12,14 @@ pub use color::Rgba;
 /// This replaces the idiom `Option<Either<CurlyBraced<TokenStream>, T>>` commonly
 /// used in parsing contents that may be expressions.
 #[derive(Debug, Clone, Default)]
-pub enum MaybeExpr<T>{
+pub enum MaybeExpr<T, TExpr=TokenStream>{
     #[default]
     None,
     Value(T),
-    Expr(TokenStream),
+    Expr(TExpr),
 }
 
-impl<T> MaybeExpr<T> {
+impl<T, TExpr> MaybeExpr<T, TExpr> {
     pub fn is_some(&self) -> bool {
         !matches!(self, MaybeExpr::None)
     }
@@ -28,33 +28,40 @@ impl<T> MaybeExpr<T> {
         matches!(self, MaybeExpr::None)
     }
 
-    pub fn get(&self) -> Option<&Self> {
+    pub fn get(&self) -> Option<ValueOrExpr<T, TExpr>> {
         match self {
             MaybeExpr::None => None,
-            expr => Some(expr),
+            MaybeExpr::Expr(e) => Some(ValueOrExpr::Expr(e)),
+            MaybeExpr::Value(v) => Some(ValueOrExpr::Value(v)),
         }
     }
 }
 
 
-impl<T: FromMacro> FromMacro for MaybeExpr<T> {
+impl<T: FromMacro, TExpr: FromMacro> FromMacro for MaybeExpr<T, TExpr> {
     fn from_one(tt: macroex::proc_macro2::TokenTree) -> Result<Self, macroex::Error> {
         match tt {
             TokenTree::Group(ref g) if g.delimiter() == Delimiter::Brace => {
-                Ok(Self::Expr(g.stream()))
+                let All(expr) = g.stream().into_iter().extract()?;
+                Ok(Self::Expr(expr))
             },
             tt => Ok(Self::Value(T::from_one(tt)?))
         }
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum ValueOrExpr<'t, T, TExpr=TokenStream>{
+    Value(&'t T),
+    Expr(&'t TExpr),
+}
 
-impl<T: ToTokens> quote::ToTokens for MaybeExpr<T> {
+
+impl<T: ToTokens, TExpr: ToTokens> quote::ToTokens for ValueOrExpr<'_, T, TExpr> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         match self {
-            MaybeExpr::None => panic!("Cannot format None."),
-            MaybeExpr::Value(v) => v.to_tokens(tokens),
-            MaybeExpr::Expr(t) => t.to_tokens(tokens),
+            ValueOrExpr::Value(v) => v.to_tokens(tokens),
+            ValueOrExpr::Expr(t) => t.to_tokens(tokens),
         }
     }
 }
